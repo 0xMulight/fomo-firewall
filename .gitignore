@@ -1,0 +1,14 @@
+node_modules/
+.next/
+out/
+build/
+.env
+.env.local
+.env.*.local
+*.tsbuildinfo
+next-env.d.ts
+.DS_Store
+# local tunnel artifacts (ephemeral public URL)
+tunnel.log
+tunnel-url.txt
+*.tmp.json
