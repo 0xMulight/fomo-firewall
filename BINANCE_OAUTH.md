@@ -1,6 +1,10 @@
 # Binance OAuth — 获取 MCP Token 的完整步骤
 
-> 目标：让 `/api/binance/status` 真实返回 `"connected": true`，页面亮起 `LIVE · BINANCE MCP` + `AGENT OS CONNECTED`。
+> **2026-09-08 实测更新**：OAuth 流程已端到端跑到币安授权页——client metadata document、PKCE、redirect 全部通过校验（授权页正常渲染「访问 Agentic 账户」）。但币安在授权页弹出：
+>
+> **「当前 Agent 暂时不支持。请使用支持的 Agent 重新连接币安 MCP server。(3346001-0cd913e4)」**
+>
+> 结论：Binance Agent OS MCP 当前处于**白名单阶段**，只接受官方合作的 Agent（Claude / ChatGPT / Codex / VS Code 等），自定义 OAuth client 在授权环节被服务端拒绝。这是平台侧策略，非代码问题。待币安开放注册后，运行 `node scripts/binance-oauth.mjs` 即可完成接入。
 
 ## 已实测确认的事实（2026-09-08，非猜测）
 
