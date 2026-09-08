@@ -103,6 +103,11 @@ class BinanceMcpClient {
         return true;
       } catch (err) {
         this.lastError = err instanceof Error ? err.message : String(err);
+        // The SDK often swallows the raw HTTP status (e.g. a bare 401 from the
+        // OAuth gate shows up as "Error POSTing to endpoint: <empty>").
+        // Do one raw probe so the status endpoint can report the real cause.
+        const raw = await this.probeRawStatus();
+        if (raw) this.lastError = `${this.lastError} | raw HTTP ${raw}`;
         this.log(`Binance MCP connection failed: ${this.lastError}. Falling back.`);
         this.client = null;
         this.tools = null;
@@ -113,6 +118,47 @@ class BinanceMcpClient {
     })();
 
     return this.connecting;
+  }
+
+  /**
+   * Raw initialize probe used only for error reporting: returns the real HTTP
+   * status and a hint (e.g. "401 (OAuth Bearer required)") so operators can see
+   * exactly why the MCP session could not be established.
+   */
+  private async probeRawStatus(): Promise<string | null> {
+    try {
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        Accept: "application/json, text/event-stream",
+      };
+      const token = process.env.BINANCE_MCP_TOKEN;
+      if (token) headers.Authorization = `Bearer ${token}`;
+      const res = await fetch(MCP_URL, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          method: "initialize",
+          params: {
+            protocolVersion: "2025-03-26",
+            capabilities: {},
+            clientInfo: { name: "fomo-firewall-probe", version: "0.2.0" },
+          },
+        }),
+        cache: "no-store",
+        signal: AbortSignal.timeout(CONNECT_TIMEOUT_MS),
+      });
+      const wwwAuth = res.headers.get("www-authenticate");
+      if (res.status === 401) {
+        return wwwAuth?.includes("Bearer")
+          ? "401 (OAuth Bearer token required — set BINANCE_MCP_TOKEN)"
+          : "401 (unauthorized)";
+      }
+      return `${res.status}`;
+    } catch (e) {
+      return `probe failed: ${e instanceof Error ? e.message : String(e)}`;
+    }
   }
 
   private resolveCapabilities(): void {
