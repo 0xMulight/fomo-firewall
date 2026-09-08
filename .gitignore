@@ -15,3 +15,4 @@ tunnel-url.txt
 
 .vercel
 .env*
+oauth.log

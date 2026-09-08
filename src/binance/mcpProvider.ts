@@ -213,6 +213,7 @@ export class BinanceMCPProvider implements BinanceProvider {
       symbol: plan.symbol,
       side: plan.side,
       quoteOrderQty: plan.amountUsdt,
+      type: "MARKET",
     });
     const orderId = payload?.orderId ?? payload?.id;
     return {

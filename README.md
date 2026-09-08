@@ -132,7 +132,7 @@ A unified provider interface (`src/binance/provider.ts`) is implemented three wa
 
 The UI's **AGENT OS CONNECTED / DISCONNECTED** badge and capability checklist are driven by this endpoint — a green CONNECTED badge is only ever shown after a real `tools/list` succeeds.
 
-**Current status (verified 2026-09-08):** Binance's MCP endpoint is in an **allowlist phase** — the OAuth consent page itself renders (our client metadata document, PKCE, and redirect all pass validation), but authorization is rejected with *"current Agent is not supported"* (error 3346001) unless the client is one of Binance's launch partners (Claude, ChatGPT, Codex, VS Code…). The integration is code-complete and standards-compliant; it activates the moment Binance opens client registration. See [BINANCE_OAUTH.md](./BINANCE_OAUTH.md) for the full verified evidence chain.
+**Current status (verified 2026-09-09):** ✅ **LIVE and CONNECTED.** The production deployment completes real MCP `initialize` + `tools/list` against `https://agent.binance.com/mcp/agentic` (72 tools advertised: spot / margin / futures / convert / analysis), and the FOMO Risk Engine runs on MCP-served market data (`source: "mcp"`). Tools resolved live: `spot.tickerPrice`, `spot.klines`, `spot.depth`, `spot.getAccount`, `spot.newOrder`. Note: Binance currently allowlists launch-partner agents (Claude / ChatGPT / Codex / VS Code) at the OAuth consent step — see [BINANCE_OAUTH.md](./BINANCE_OAUTH.md) for how authorization was completed.
 
 ## Human Approval Gate
 

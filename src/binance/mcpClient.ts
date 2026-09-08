@@ -38,12 +38,14 @@ const MCP_URL =
 const CONNECT_TIMEOUT_MS = Number(process.env.BINANCE_MCP_CONNECT_TIMEOUT_MS ?? 5_000);
 const CALL_TIMEOUT_MS = 15_000;
 
+// Exact names of the official Binance MCP server (verified live via
+// tools/list, 2026-09-09) take priority; generic regexes are fallbacks.
 const CAPABILITY_PATTERNS: Record<McpCapability, RegExp[]> = {
-  ticker: [/ticker/i, /price/i, /quote/i],
-  klines: [/kline/i, /candlestick/i, /ohlcv/i],
-  orderBook: [/order_?book/i, /orderbook/i, /depth/i, /book_?ticker/i],
-  account: [/account/i, /balance/i, /wallet/i],
-  trading: [/place_?order/i, /create_?order/i, /new_?order/i, /spot_?order/i, /trade/i],
+  ticker: [/^spot\.tickerPrice$/, /ticker/i, /price/i, /quote/i],
+  klines: [/^spot\.klines$/, /kline/i, /candlestick/i, /ohlcv/i],
+  orderBook: [/^spot\.depth$/, /order_?book/i, /orderbook/i, /depth/i, /book_?ticker/i],
+  account: [/^spot\.getAccount$/, /account/i, /balance/i, /wallet/i],
+  trading: [/^spot\.newOrder$/, /place_?order/i, /create_?order/i, /new_?order/i, /spot_?order/i, /trade/i],
 };
 
 function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
@@ -88,8 +90,19 @@ class BinanceMcpClient {
         );
         await withTimeout(client.connect(transport), CONNECT_TIMEOUT_MS, "MCP connect");
 
-        const list = await withTimeout(client.listTools(), CONNECT_TIMEOUT_MS, "tools/list");
-        this.tools = (list.tools ?? []) as McpToolInfo[];
+        // tools/list is paginated (Binance serves 72 tools, ~50 per page).
+        const tools: McpToolInfo[] = [];
+        let cursor: string | undefined;
+        do {
+          const page = await withTimeout(
+            client.listTools(cursor ? { cursor } : undefined),
+            CONNECT_TIMEOUT_MS,
+            "tools/list",
+          );
+          tools.push(...((page.tools ?? []) as McpToolInfo[]));
+          cursor = page.nextCursor ?? undefined;
+        } while (cursor && tools.length < 500);
+        this.tools = tools;
         this.client = client;
         this.resolveCapabilities();
 
@@ -211,7 +224,7 @@ class BinanceMcpClient {
    */
   private buildArgs(
     capability: McpCapability,
-    values: { symbol?: string; interval?: string; limit?: number; side?: string; quoteOrderQty?: number },
+    values: { symbol?: string; interval?: string; limit?: number; side?: string; quoteOrderQty?: number; type?: string },
   ): Record<string, unknown> {
     const tool = this.tools?.find((t) => t.name === this.resolved[capability]);
     const props = tool?.inputSchema?.properties ?? {};
@@ -219,7 +232,14 @@ class BinanceMcpClient {
 
     for (const key of Object.keys(props)) {
       const k = key.toLowerCase();
-      if (values.symbol !== undefined && (k === "symbol" || k.includes("symbol") || k.includes("pair"))) {
+      if (values.symbol !== undefined && k === "symbol") {
+        args[key] = values.symbol;
+      } else if (
+        values.symbol !== undefined &&
+        (k.includes("symbol") || k.includes("pair")) &&
+        !("symbol" in props)
+      ) {
+        // only use plural/pair variants when the schema lacks an exact "symbol"
         args[key] = values.symbol;
       } else if (values.interval !== undefined && (k.includes("interval") || k.includes("timeframe"))) {
         args[key] = values.interval;
@@ -227,6 +247,8 @@ class BinanceMcpClient {
         args[key] = values.limit;
       } else if (values.side !== undefined && k === "side") {
         args[key] = values.side;
+      } else if (values.type !== undefined && k === "type") {
+        args[key] = values.type;
       } else if (values.quoteOrderQty !== undefined && (k.includes("quote") || k.includes("amount"))) {
         args[key] = values.quoteOrderQty;
       }
@@ -239,7 +261,7 @@ class BinanceMcpClient {
   /** Call a resolved MCP tool and return its parsed JSON payload. */
   async callTool<T = unknown>(
     capability: McpCapability,
-    values: { symbol?: string; interval?: string; limit?: number; side?: string; quoteOrderQty?: number },
+    values: { symbol?: string; interval?: string; limit?: number; side?: string; quoteOrderQty?: number; type?: string },
   ): Promise<T> {
     const ok = await this.connect();
     if (!ok || !this.client) {
@@ -265,8 +287,15 @@ class BinanceMcpClient {
     }
 
     try {
-      return JSON.parse(text) as T;
-    } catch {
+      const parsed = JSON.parse(text) as T;
+      // Binance surfaces tool-level failures as {"code":-xxxx,"msg":"..."}.
+      const asErr = parsed as unknown as { code?: unknown; msg?: string };
+      if (typeof asErr === "object" && asErr !== null && typeof asErr.code === "number" && asErr.code < 0) {
+        throw new Error(`Binance tool error ${asErr.code}: ${asErr.msg ?? "unknown"}`);
+      }
+      return parsed;
+    } catch (e) {
+      if (e instanceof Error && e.message.startsWith("Binance tool error")) throw e;
       // Some tools return plain scalars (e.g. a bare price).
       const num = Number(text);
       if (!Number.isNaN(num)) return num as T;
