@@ -132,7 +132,7 @@ A unified provider interface (`src/binance/provider.ts`) is implemented three wa
 
 The UI's **AGENT OS CONNECTED / DISCONNECTED** badge and capability checklist are driven by this endpoint — a green CONNECTED badge is only ever shown after a real `tools/list` succeeds.
 
-**To finish live MCP setup (manual steps):** use a network that can reach `agent.binance.com`, complete the Binance OAuth flow for the MCP endpoint, then set `BINANCE_MCP_TOKEN` in `.env`. Tokens stay server-side only — never in the frontend bundle, never in git, never in logs. A connectivity test script is included: `node scripts/test-mcp.mjs` (it reports real failures, never masks them).
+**To finish live MCP setup (manual steps):** use a network that can reach `agent.binance.com`, complete the Binance OAuth flow, then set `BINANCE_MCP_TOKEN` in `.env`. A ready-made helper does the whole OAuth + PKCE flow for you: `node scripts/binance-oauth.mjs` — see [BINANCE_OAUTH.md](./BINANCE_OAUTH.md) for the verified endpoints and step-by-step guide. Tokens stay server-side only — never in the frontend bundle, never in git, never in logs. A connectivity test script is included: `node scripts/test-mcp.mjs` (it reports real failures, never masks them).
 
 ## Human Approval Gate
 

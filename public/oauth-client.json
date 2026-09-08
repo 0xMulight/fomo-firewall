@@ -1,0 +1,13 @@
+{
+  "client_id": "https://fomo-firewall-pearl.vercel.app/oauth-client.json",
+  "client_name": "FOMO Firewall",
+  "client_uri": "https://fomo-firewall-pearl.vercel.app",
+  "logo_uri": "https://fomo-firewall-pearl.vercel.app/icon.svg",
+  "redirect_uris": [
+    "http://127.0.0.1:8790/callback",
+    "http://localhost:8790/callback"
+  ],
+  "grant_types": ["authorization_code"],
+  "response_types": ["code"],
+  "token_endpoint_auth_method": "none"
+}

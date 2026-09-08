@@ -12,3 +12,6 @@ next-env.d.ts
 tunnel.log
 tunnel-url.txt
 *.tmp.json
+
+.vercel
+.env*
